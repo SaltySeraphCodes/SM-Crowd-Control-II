@@ -1,0 +1,9 @@
+{
+   "allow_add_mods" : true,
+   "custom_icons" : false,
+   "description" : "Let Youtube chat Control your world!",
+   "localId" : "0ad813dd-f9e5-4ccb-9cec-15fcbab86289",
+   "name" : "Scrap Mechanic Crowd Control",
+   "type" : "Custom Game",
+   "version" : 0
+}

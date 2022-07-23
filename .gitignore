@@ -1,0 +1,4 @@
+# Untrack folders
+steamcmd/*
+!steamcmd.exe
+!./steamcmd/steamcmd.exe
