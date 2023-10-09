@@ -1,32 +1,22 @@
-Timer = class( nil ) -- TImer 2.0
+function CreateTimer( self )
+    TimerClass = class()
+    TimerClass.Env = self
+    TimerClass.ActiveTimers = {}
 
-function Timer.start( self, ticks )
-	self.ticks = ticks or 0
-	self.count = 0
-end
+    function TimerClass:Delay( time, callback, params )
+        table.insert(self.ActiveTimers, {t=time, c=callback, e=env, p=params})
+    end
 
-function Timer.reset( self )
-	self.ticks = self.ticks or -1
-	self.count = 0
-end
+    function TimerClass:Tick()
+        for _,i in pairs(self.ActiveTimers) do
+            i.t = i.t - 1
+            if i.t <= 0 then
+                i.c(i.p)
+                table.remove(self.ActiveTimers, i)
+            end
+        end
+    end
 
-function Timer.stop( self )
-	self.ticks = -1
-	self.count = 0
-end
-
-function Timer.tick( self )
-	self.count = self.count + 1
-end
-
-function Timer.status(self)
-	return self.count 
-end
-
-function Timer.remaining(self)
-	return self.ticks-self.count
-end
-
-function Timer.done( self )
-	return self.ticks >= 0 and self.count >= self.ticks
+    self.Timer = TimerClass
+    self.Delay = Delay
 end
