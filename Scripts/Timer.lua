@@ -1,5 +1,5 @@
 function CreateTimer( self )
-    TimerClass = class()
+    local TimerClass = class()
     TimerClass.Env = self
     TimerClass.ActiveTimers = {}
 
@@ -11,12 +11,11 @@ function CreateTimer( self )
         for _,i in pairs(self.ActiveTimers) do
             i.t = i.t - 1
             if i.t <= 0 then
-                i.c(i.p)
-                table.remove(self.ActiveTimers, i)
+                i.c(self.Env, i.p)
+                table.remove(self.ActiveTimers, _)
             end
         end
     end
 
     self.Timer = TimerClass
-    self.Delay = Delay
 end

@@ -3,7 +3,7 @@ SaltySeraph = class()
 
 ---@class World
 ---@type Server
----@param sm.player.getAllPlayers()[1]:getWorldPosition() location 
+---@param sm.player.getAllPlayers()[1]:getCharacter():getWorldPosition() location 
 function SaltySeraph.Blast( self, params )
     local units = sm.unit.getAllUnits()
     for i, unit in ipairs( units ) do
@@ -18,23 +18,22 @@ function SaltySeraph.Blast( self, params )
     end
 end
 
----@class Game
+---@class Player
 ---@type Server
----@param sm.player.getAllPlayers()[1] player
 function SaltySeraph.Fast( self, params )
-    params.player.character:setMovementSpeedFraction( params.speed )
+    self.player:getCharacter():setMovementSpeedFraction( 3 )
     -- Delay in ticks
-    self.Delay( 400, SaltySeraph.EndFast, params )
+    self.Timer:Delay( 400, SaltySeraph.EndFast, params )
 end
 
----@class Game
+---@class Player
 ---@type Server
 ---@field Callback
 function SaltySeraph.EndFast( self, params )
-    params.character:setMovementSpeedFraction( 1 )
+    self.player:getCharacter():setMovementSpeedFraction( 1 )
 end
 
----@class Game
+---@class World
 ---@type Server
 ---@field Generic
 ---@param sm.player.getAllPlayers()[1] player
@@ -50,8 +49,9 @@ function SaltySeraph.Kit( self, params )
         sm.container.collect( container, obj_pneumatic_pipe_03, 10 )
         sm.container.collect( container, obj_resource_glowpoop, 100 )
         sm.container.endTransaction()
-    else 
-        sm.event.sendToWorld( params.player.character:getWorld(), "sv_e_onChatCommand", params )
+    else
+        self:sv_e_onChatCommand(params)
+        --sm.event.sendToWorld( params.player.character:getWorld(), "sv_e_onChatCommand", params )
     end
 end
 
@@ -74,15 +74,16 @@ function SaltySeraph.SearchKitParam(kit)
     return instruct
 end
 
----@class Game
+---@class World
 ---@type Server
+---@param sm.player.getAllPlayers()[1]:getCharacter():getWorldPosition() location
 function SaltySeraph.Rain( self, params )
     local bodies = sm.body.getAllBodies()
     for _, body in ipairs( bodies ) do
         local usable = body:isUsable()
-        if usable then 
+        if usable then
             local shape = body:getShapes()[1]
-            if shape:getShapeUuid() == obj_interactive_propanetank_small or  shape:getShapeUuid() == obj_interactive_propanetank_large then
+            if shape:getShapeUuid() == obj_interactive_propanetank_small or shape:getShapeUuid() == obj_interactive_propanetank_large then
                 sm.physics.explode( shape:getWorldPosition() , 7, 2.0, 6.0, 25.0, "RedTapeBot - ExplosivesHit" )
             end
         end
@@ -96,7 +97,7 @@ end
 ---@type Server
 function SaltySeraph.Shield( self, params )
     g_godMode = true
-    self.Delay( 400, SaltySeraph.RemoveShield, params )
+    self.Timer:Delay( 400, SaltySeraph.RemoveShield, params )
 end
 
 ---@class Game
@@ -112,7 +113,7 @@ function SaltySeraph.Slap( self, params )
     local direction = sm.vec3.new(sm.noise.randomRange(-1,1),sm.noise.randomRange(-1,1),sm.noise.randomRange(0,1))
     local force = sm.noise.randomRange(1000,7000) 
     self.player.character:setTumbling( true )
-    self.Delay( 8, SaltySeraph.ImpulseSlap, {slap = direction * force} )
+    self.Timer:Delay( 8, SaltySeraph.ImpulseSlap, {slap = direction * force} )
 end
 
 ---@class Player

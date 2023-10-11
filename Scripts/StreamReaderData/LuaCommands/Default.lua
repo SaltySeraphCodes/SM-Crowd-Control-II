@@ -1,11 +1,10 @@
 dofile("$CONTENT_DATA/Scripts/StreamReaderData/Generated/Default.generated.lua")
 Default = class()
 
----@class Game
+---@class World
 ---@type Server
 ---@param sm.player.getAllPlayers()[1] player 
 function Default.Aggro( self, params )
-    sm.game.setEnableAggro( true )
     local units = sm.unit.getAllUnits()
     for _, unit in ipairs( units ) do
         sm.event.sendToUnit( unit, "sv_e_receiveTarget", { targetCharacter = params.player.character } )
@@ -13,12 +12,9 @@ function Default.Aggro( self, params )
 end
 
 ---@class Game
----@type Server
----@param sm.player.getAllPlayers()[1] player
-function Default.Give( self, params )
-    sm.container.beginTransaction()
-    sm.container.collect( params.player:getInventory(), params.item, params.quantity, false )
-    sm.container.endTransaction()
+---@type Client
+function Default.Give( self, param )
+    self:cl_onChatCommand( { "/" .. param } )
 end
 
 ---@class Player
@@ -41,30 +37,92 @@ function Default.Kill( self, params )
     self.network:setClientData( self.sv.saved )
 end
 
----@class Game
+---@class World
 ---@type Server
 ---@alias Ambush
 function Default.Raid( self, params )
-    sm.event.sendToWorld( self.sv.saved.overworld, "sv_ambush", {wave = true, magnitude = 10} )
+    --sm.event.sendToWorld( self.sv.saved.overworld, "sv_ambush", {wave = true, magnitude = 10} )
+    params = {wave = true, magnitude = 2}
+    print( "Ambush - magnitude:", params.magnitude, "wave:", params.wave )
+	local players = sm.player.getAllPlayers()
+
+	for _, player in pairs( players ) do
+		if player.character and player.character:getWorld() == self.world then
+			local incomingUnits = {}
+
+			local playerPosition = player.character.worldPosition
+			local playerDensity = g_unitManager:sv_getPlayerDensity( playerPosition )
+
+			if params.wave then
+                for i = 0, params.magnitude do
+				    incomingUnits[#incomingUnits + 1] = unit_haybot
+                    incomingUnits[#incomingUnits + 1] = unit_haybot
+                    incomingUnits[#incomingUnits + 1] = unit_totebot_green
+                    incomingUnits[#incomingUnits + 1] = unit_totebot_green
+                end
+			end
+
+			local minDistance = 20
+			local maxDistance = 32 -- 128 is maximum guaranteed terrain distance
+			local validNodes = sm.pathfinder.getSortedNodes( playerPosition, minDistance, maxDistance )
+			local validNodesCount = table.maxn( validNodes )
+
+			--local incomingUnits = g_unitManager:sv_getRandomUnits( unitCount, playerPosition )
+
+			if validNodesCount > 0 then
+				print( #incomingUnits .. " enemies are approaching!" )
+				for i = 1, #incomingUnits do
+					local selectedNode = math.random( validNodesCount )
+					local unitPos = validNodes[selectedNode]:getPosition()
+
+					local playerDirection = playerPosition - unitPos
+					local yaw = math.atan2( playerDirection.y, playerDirection.x ) - math.pi/2
+
+					sm.unit.createUnit( incomingUnits[i], unitPos + sm.vec3.new( 0, 0.1, 0), yaw, { temporary = true, roaming = true, ambush = true, tetherPoint = playerPosition } )
+				end
+			else
+				local maxSpawnAttempts = 32
+				for i = 1, #incomingUnits do
+					local spawnAttempts = 0
+					while spawnAttempts < maxSpawnAttempts do
+						spawnAttempts = spawnAttempts + 1
+						local distanceFromCenter = math.random( minDistance, maxDistance )
+						local spawnDirection = sm.vec3.new( 0, 1, 0 )
+						spawnDirection = spawnDirection:rotateZ( math.rad( math.random( 359 ) ) )
+						local spawnPosition = playerPosition + spawnDirection * distanceFromCenter
+
+						local success, result = sm.physics.raycast( spawnPosition + sm.vec3.new( 0, 0, 128 ), spawnPosition + sm.vec3.new( 0, 0, -128 ), nil , -1 )
+						if success and ( result.type == "limiter" or result.type == "terrainSurface" ) then
+							local directionToPlayer = playerPosition - spawnPosition
+							local yaw = math.atan2( directionToPlayer.y, directionToPlayer.x ) - math.pi / 2
+							spawnPosition = result.pointWorld
+							sm.unit.createUnit( incomingUnits[i], spawnPosition, yaw, { temporary = true, roaming = true, ambush = true, tetherPoint = playerPosition } )
+							break
+						end
+					end
+				end
+			end
+		end
+	end
 end
 
 ---@class Game
 ---@type Server
-function Default.Spawn( self, params )
+function Default.Spawn( self, param )
     local spawnParams = {
-        uuid = sm.uuid.new( "00000000-0000-0000-0000-000000000000" ),
-        world = self.world,
-        position = self.playerLocation + sm.vec3.new(sm.noise.randomRange(-25,25),sm.noise.randomRange(-25,25),4),
+        uuid = Default.SearchUnitID(param),
+        world = self.sv.saved.overworld,
+        position = sm.player.getAllPlayers()[1]:getCharacter():getWorldPosition() + sm.vec3.new(sm.noise.randomRange(-15,15),sm.noise.randomRange(-15,15),4),
         yaw = 0.0,
         amount = 1 --TODO: Give Members chance to spawn up to 10?
     }
-    spawnParams.uuid = Default.SearchUnitID(params[2]) 
-    self.network:sendToServer( "sv_spawnUnit", spawnParams )
+    self:sv_spawnUnit( spawnParams )
 end
 
 ---@field Global
-function Default.SearchUnitID(unit)
+function Default.SearchUnitID( unit )
     local uuid = nil
+    print(unit)
     if unit == "woc" then
         uuid = unit_woc
     elseif unit == "tapebot"  then
@@ -84,13 +142,13 @@ function Default.SearchUnitID(unit)
 end
 
 ---@class Game
----@type Server
+---@type Client
 function Default.Import( self, params )
     objName = params
     playerDir = ( sm.vec3.new( 1, 1, 0 ) * sm.camera.getDirection() ) + sm.vec3.new( 0, 0, 2.5 )
     direction = playerDir * 5
 
-    if(type(params)=="table") then
+    if(type(params)==type({})) then
         objName = params[1]
         random_n = 0
         if params[2] ~= nil then
@@ -126,5 +184,6 @@ function Default.Import( self, params )
         error('sm.interop is not enabled for this world')
     end
     ]]
-    sm.creation.importFromFile( lparams.world, download_folder.."/blueprint.json", lparams.position, nil, true )
+    -- sm.creation.importFromFile( lparams.world, download_folder.."/blueprint.json", lparams.position, nil, true )
+    self.network:sendToServer("importFromFile", lparams)
 end

@@ -79,13 +79,16 @@ function StreamReader.init(self)
 end
 
 function StreamReader.sv_readJson( self, fileName )
-    local instructions = sm.json.open( fileName )
-    if instructions ~= nil then
+    local success, instructions = pcall(sm.json.open, fileName )
+    if success then
+        if instructions ~= nil then
+            return instructions
+        else
+            return nil
+        end
         return instructions
-    else
-        return nil
     end
-    return instructions
+    return nil
 end
 
 function StreamReader.runInstructions(self,instructionQue)
@@ -130,28 +133,35 @@ function StreamReader.runInstruction( self, instruction )
         self.loadedFiles[instruction.file] = true
     end
 
-    if instruction.class == "Game" then
-        if instruction.network == "Server" then
-            self.network:sendToServer("server_runInstruction", instruction)
+    if not sm.host then
+        sm.host = sm.player.getAllPlayers()[1]
+    end
+
+    if instruction.network == "Server" then
+        self.network:sendToServer("server_runInstruction", instruction)
+    else
+        if instruction.class == "Player" then
+            sm.event.sendToPlayer(sm.host, "ambigous_runInstruction", instruction)
+        elseif instruction.class == "World" then
+            sm.event.sendToWorld(sm.host:getCharacter():getWorld(), "ambigous_runInstruction", instruction)
         else
             StreamReader.ambigous_runInstruction( self, instruction )
-        end
-    elseif instruction.class == "Player" then
-        local player = sm.player.getAllPlayers()[1]
-        if instruction.network == "Server" then
-            self.network:sendToServer("server_runInstructionPlayer", {p=player,i=instruction})
-        else
-            sm.event.sendToPlayer(player, "client_runInstruction", instruction)
         end
     end
 end
 
-function StreamReader.server_runInstructionPlayer( self, d )
-    sm.event.sendToPlayer(d.p, "server_runInstruction", d.i)
-end
-
 function StreamReader.server_runInstruction( self, instruction )
-    StreamReader.ambigous_runInstruction( self, instruction )
+    if not sm.host then
+        sm.host = sm.player.getAllPlayers()[1]
+    end
+
+    if instruction.class == "Player" then
+        sm.event.sendToPlayer(sm.host, "ambigous_runInstruction", instruction)
+    elseif instruction.class == "World" then
+        sm.event.sendToWorld(sm.host:getCharacter():getWorld(), "ambigous_runInstruction", instruction)
+    else
+        StreamReader.ambigous_runInstruction( self, instruction )
+    end
 end
 
 function StreamReader.ambigous_runInstruction( self, instruction )

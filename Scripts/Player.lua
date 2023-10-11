@@ -1,16 +1,19 @@
 dofile "$SURVIVAL_DATA/Scripts/game/SurvivalPlayer.lua"
+dofile "$CONTENT_DATA/Scripts/Timer.lua"
 
-Player = class( SurvivalPlayer )
+CustomPlayer = class( SurvivalPlayer )
 
-function Player.server_onCreate( self )
+function CustomPlayer.server_onCreate( self )
     SurvivalPlayer.server_onCreate( self )
+    CreateTimer(self)
 	print("Player.server_onCreate")
 end
 
-function Player.server_runInstruction( self, instruction )
-    StreamReader.ambigous_runInstruction( self, instruction )
+function CustomPlayer.server_onFixedUpdate( self, timeStep )
+    SurvivalPlayer.server_onFixedUpdate( self, timeStep )
+    self.Timer:Tick()
 end
 
-function Player.client_runInstruction( self, instruction )
+function CustomPlayer.ambigous_runInstruction( self, instruction )
     StreamReader.ambigous_runInstruction( self, instruction )
 end
